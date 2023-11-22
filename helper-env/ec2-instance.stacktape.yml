@@ -1,0 +1,5 @@
+serviceName: helper-env
+
+resources:
+  tester:
+    type: bastion

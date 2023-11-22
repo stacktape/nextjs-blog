@@ -1,0 +1,7 @@
+serviceName: next-edge
+
+resources:
+  web:
+    type: nextjs-web
+    properties:
+      useEdgeLambda: true

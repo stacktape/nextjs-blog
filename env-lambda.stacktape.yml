@@ -1,0 +1,5 @@
+serviceName: next-lambda
+
+resources:
+  web:
+    type: nextjs-web
