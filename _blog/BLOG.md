@@ -181,7 +181,9 @@ This graph also confirms that the container is able to process around 4500 reque
 
 ---
 
-## Pricing
+## Test 3 - Pricing
+
+Rather than a test, this section is more of pricing comparison between the environments based on our previous tests and AWS pricing info.
 
 Let's start by creating formulas for calculating the price of environments.
 
