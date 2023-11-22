@@ -1,3 +1,5 @@
+# Performance comparison: Next.js alongside Fargate, Lambda and Lambda@Edge
+
 In this article, we'll explore how Next.js, a popular React framework, works alongside key AWS services: **Lambda**, **Lambda@Edge**, and **Fargate**. These technologies play a vital role in modern web development, offering serverless and containerized solutions.
 
 Our aim is to help developers understand the performance impact of combining [Next.js](https://nextjs.org/) with these AWS services. We'll dive into the technical details, providing practical examples and benchmarks to empower developers in making informed decisions for building high-performance, serverless web applications.
