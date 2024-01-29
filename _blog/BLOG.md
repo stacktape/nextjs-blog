@@ -34,9 +34,9 @@ If for some reason you are unable/do not wish to use the fully managed solutions
 - **Flexibility** - integrate easily with any other backend services offered by the cloud.
 - **Lower costs** - much cheaper than Vercel or Netlify (especially at scale).
 
-The recommended self-hosting approach by the creators of Next.js is to containerize your app and deploy it anywhere you need - allowing you to deploy your app basically anywhere. It is an easy approach that can also be reasonably cheap.
+The recommended self-hosting approach by the creators of Next.js is to **containerize your app** and deploy it anywhere you need - allowing you to deploy your app basically anywhere. It is an easy approach that can also be reasonably cheap.
 
-**The problem is that while with Vercel or Netlify your website is basically free when you have very low or no traffic at all, for the container you have to pay even if it is running idly.**
+**The problem: While with Vercel or Netlify your website is basically free when you have very low or no traffic at all, for the container you have to pay even if it is running idly.**
 
 Throughout the existence of Next.js, there were multiple attempts to provide developers a way to **self-host** their Next.js app using AWS Lambda, giving you the benefits of Vercel...
 
@@ -67,7 +67,9 @@ In our test, we will be comparing 3 deployment setups of the Next.js app:
 
 All of our environments are set in the `eu-west-1`(Ireland) region, which means most of the infrastructure is localized in this region (understandably the Lambda@Edge must be set up in the `us-east-1` region).
 
-Additionally, we have set up two EC2 instances to interact with our Next.js app: one for each `eu-west-1`(Ireland) and `us-east-1`(Virginia) region.
+All of our environments are production-ready and have CDN enabled. However, since we are measuring the performance of the underlying compute engines, **we will send requests directly to the Lambda/Container origins, to simulate the way CloudFront(CDN) sends requests to these origins**.
+
+Additionally, we have set up two EC2 instances to interact with our Next.js app: one in each `eu-west-1`(Ireland) and `us-east-1`(Virginia) region.
 
 ---
 
@@ -76,8 +78,6 @@ Additionally, we have set up two EC2 instances to interact with our Next.js app:
 <!-- In the first test, we will measure latency (response time) by sending requests to the Next.js app. -->
 
 The goal of the test is to compare average response time from the origins across the environments, when the load is low.
-
-All of our environments are production-ready and have CDN enabled. However, since we are measuring the performance of the underlying compute engines, we will send requests directly to the Lambda/Container origins, **to simulate the way CloudFront(CDN) sends requests to these origins**.
 
 For regular **Lambda** and **Container** environments we will conduct the test twice:
 
@@ -177,7 +177,7 @@ The previous graph shows, that as the traffic is ramping up, the average latency
 
 This graph also confirms that the container is able to process around 4500 requests per minute which corresponds to the ~700request/sec threshold, we estimated from previous graph.
 
-> It should be noted that the our simulation conditions might not be completely the same as what users experience in their Next.js app. Production app might be generally more complex - fetching data from APIs and databases, or performing more resource-intensive operations.
+> It should be noted that the our simulation conditions might not be completely the same as what users experience in their Next.js app. User's production app might be generally more complex - fetching data from APIs and databases, or performing more resource-intensive operations.
 
 ---
 
