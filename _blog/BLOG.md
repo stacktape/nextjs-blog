@@ -69,7 +69,7 @@ All of our environments are set in the `eu-west-1`(Ireland) region, which means 
 
 All of our environments are production-ready and have CDN enabled. However, since we are measuring the performance of the underlying compute engines, **we will send requests directly to the Lambda/Container origins, to simulate the way CloudFront(CDN) sends requests to these origins**.
 
-Additionally, we have set up two EC2 instances to interact with our Next.js app: one in each `eu-west-1`(Ireland) and `us-east-1`(Virginia) region.
+Additionally, we have set up two EC2 instances to interact(send requests) with our Next.js app: one in each `eu-west-1`(Ireland) and `us-east-1`(Virginia) region.
 
 ---
 
