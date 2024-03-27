@@ -1,0 +1,352 @@
+<h1>Performance comparison: Next.js alongside Fargate, Lambda and Lambda@Edge</h1>
+<p><strong>Hosting Next.js isn&#39;t just about Vercel.</strong> Sure, Vercel has unbeatable support for Next.js and offers a fantastic developer experience…</p>
+<p>…but, have you ever thought:</p>
+<ul>
+<li>That you can <strong>easily host your Next.js app on AWS almost for free</strong> using AWS Lambda?</li>
+<li>When it actually makes more sense to use containers for Next.js instead of going full serverless?</li>
+</ul>
+<p>Today, I&#39;m diving into how Next.js can smoothly integrate with key AWS services: <strong>Lambda</strong>, <strong>Lambda@Edge</strong>, and <strong>Fargate</strong>. Opting for these services over managed solutions like Vercel can bring you greater flexibility and significant cost savings.</p>
+<p>In this post, I’ll be deploying the same Next.js app using these AWS services, running a bunch of performance tests, and then crunching the numbers to figure out the costs for each setup. Ready to see how it goes?</p>
+<h2>Deployment options</h2>
+<p>If you&#39;re diving into Next.js and aren&#39;t quite sure how to deploy your app, here&#39;s the lowdown on your options.</p>
+<p>You&#39;ve got two main paths:</p>
+<ol>
+<li><strong>Fully managed solutions</strong> that take care of everything for you.</li>
+<li><strong>Self-managed setups</strong> that give you the reins (and don&#39;t worry, they can be hassle-free too).</li>
+</ol>
+<h3>1. Fully managed solutions</h3>
+<p><img src="resources/shock-vercel.jpg" alt="Monkey meme"></p>
+<p>For deploying Next.js apps, <a href="https://vercel.com/">Vercel</a> is a top pick. It&#39;s built by the same folks who created Next.js, so you get a smooth experience, easy scaling, and more right out of the box. <a href="https://www.netlify.com/">Netlify</a> offers a similar easy setup with plenty of features.</p>
+<p>I&#39;ve personally used both Vercel and Netlify for various projects thanks to their generous free tiers. But, there are a couple of things to keep in mind:</p>
+<ul>
+<li>Costs can jump quickly once you move beyond the free tier.</li>
+<li>Vercel&#39;s free tier won&#39;t let you run ads on your site.</li>
+<li>Need a private VPC for extra security or compliance? You might be looking at a pricey enterprise plan.</li>
+</ul>
+<p>So what to do if these options don&#39;t fit your needs? That&#39;s where self-hosting on AWS comes into play.</p>
+<h3>2. Self-managed setup</h3>
+<p>Not into the fully managed route or need something more customizable? You&#39;re not alone. You can self-host your Next.js app on a cloud platform like AWS, which we&#39;ll focus on here. Self-hosting&#39;s got a couple of big perks:</p>
+<ul>
+<li><strong>Flexibility</strong>: Easily connect your app with any AWS service or backend.</li>
+<li><strong>Cost-effective</strong>: Generally cheaper than Vercel or Netlify, especially as you grow.</li>
+</ul>
+<p>Next.js suggests <strong>containerizing your app</strong> for a straightforward deployment process. This method is pretty simple and can keep costs down.</p>
+<p><strong>But here&#39;s the catch</strong>: While Vercel and Netlify offer free hosting for low-traffic sites, running a container on AWS means you&#39;ll pay regardless of traffic.</p>
+<p>That&#39;s why some devs have looked into <strong>hosting Next.js apps on AWS Lambda</strong> to cut costs without losing the perks of serverless, like paying per request and scaling on demand.</p>
+<p><img src="resources/lambda-developer.jpg" alt="Developer Lambda hosting"></p>
+<p>However, getting a Next.js app to run on Lambda isn&#39;t always straightforward, thanks to the framework&#39;s complexities.</p>
+<p>Thankfully, tools like <a href="https://stacktape.com/">Stacktape</a> and <a href="https://sst.dev/">SST</a> simplify this process. They leverage <a href="https://open-next.js.org/">OpenNext</a>, an open-source adapter that makes Next.js apps Lambda-friendly. Props to the OpenNext team and community for making serverless Next.js a reality.</p>
+<hr>
+<h2>Test environments</h2>
+<p>We&#39;re putting 3 Next.js deployment setups to the test:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Environment type</th>
+<th>Configuration</th>
+<th>Example Project</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>AWS Lambda</td>
+<td>1024 MB memory, built with OpenNext</td>
+<td><a href="https://github.com/stacktape/starter-nextjs-ssr-website-lambda">example project</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td>AWS Lambda@Edge</td>
+<td>1024 MB memory, built with OpenNext</td>
+<td><a href="https://github.com/stacktape/starter-nextjs-ssr-website-lambda">example project</a></td>
+</tr>
+<tr>
+<td>3</td>
+<td>AWS ECS Fargate container</td>
+<td>0.5 CPU, 1024 MB memory, HTTP API Gateway</td>
+<td><a href="https://github.com/stacktape/starter-nextjs-ssr-website-container">example project</a></td>
+</tr>
+</tbody></table>
+<p>All setups are in the <code>eu-west-1</code> (Ireland) region. However, Lambda@Edge is a bit different—it&#39;s set up in <code>us-east-1</code> but works globally.</p>
+<p>Each environment is ready for the real world, CDN included. But I&#39;m focusing on how the compute engines themselves perform, so I&#39;ll be sending requests straight to Lambda/Container origins. This mimics how CloudFront (CDN) interacts with these origins.</p>
+<p>To do this, I&#39;ve got two EC2 instances ready: one in <code>eu-west-1</code> and another in <code>us-east-1</code>.</p>
+<hr>
+<h2>Test 1 - Request/response time</h2>
+<p>We aimed to see how quick responses were from different AWS setups under light load.</p>
+<p>Here&#39;s how we did it:</p>
+<ul>
+<li><p>For <strong>Lambda</strong> and <strong>Container</strong> setups, we tested response times twice:</p>
+<ul>
+<li><strong>From <code>eu-west-1</code></strong>: This is where the servers are, mimicking a nearby user.</li>
+<li><strong>From <code>us-east-1</code></strong>: This simulates a user far from the server.</li>
+</ul>
+</li>
+<li><p>For <strong>Lambda@Edge</strong>, we only tested from <code>us-east-1</code>. Since Lambda@Edge runs closer to the user globally, testing from <code>eu-west-1</code> would be similar to the standard Lambda test.</p>
+</li>
+</ul>
+<blockquote>
+<p>We skipped the first response in each test to avoid measuring the <a href="https://docs.aws.amazon.com/lambda/latest/operatorguide/execution-environments.html#cold-start-latency">cold starts</a> of Lambda functions. Cold starts are longer due to the size of Next.js app packages, but they&#39;re not our focus here. They can be lessened in real apps with techniques like <a href="https://docs.stacktape.com/compute-resources/nextjs-website/#using-warmer">using warmer</a>.</p>
+</blockquote>
+<blockquote>
+<p><strong>How we sent requests</strong>:</p>
+<ul>
+<li>To Containers, through <code>HTTP API Gateway</code>, directing traffic straight to them.</li>
+<li>To Lambda setups, we used the <code>Lambda URL</code>. It&#39;s not exactly how CloudFront connects to Lambda@Edge, but it&#39;s close enough for our tests.</li>
+</ul>
+</blockquote>
+<h3>Results</h3>
+<table>
+<thead>
+<tr>
+<th>Origin</th>
+<th>Requests from</th>
+<th>Avg. Latency (ms)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ireland Container</td>
+<td>Ireland</td>
+<td>57.94</td>
+</tr>
+<tr>
+<td>Ireland Lambda</td>
+<td>Ireland</td>
+<td>86.27</td>
+</tr>
+<tr>
+<td>Virginia Lambda (Lambda@Edge)</td>
+<td>Virginia</td>
+<td>317.45</td>
+</tr>
+<tr>
+<td>Ireland Container</td>
+<td>Virginia</td>
+<td>377.83</td>
+</tr>
+<tr>
+<td>Ireland Lambda</td>
+<td>Virginia</td>
+<td>432.91</td>
+</tr>
+</tbody></table>
+<p>Responses were fastest from servers in the same region as the request. Containers edged out Lambda in speed slightly.</p>
+<p><strong>But why was Lambda@Edge slower?</strong> Despite running closer to the user, its setup with OpenNext and internal caching of Next.js impacts its speed.</p>
+<h3>Next.js Caching</h3>
+<p>Next.js uses caching to speed up your app and cut costs. It stores rendered pages and data with <strong>fetch data cache</strong> and <strong>full route cache</strong>. But, this caching can affect speed on Lambda@Edge.</p>
+<p><img src="resources/caching-overview.png" alt="Next.js caching mechanisms"></p>
+<h3>The Lambda Cache Issue</h3>
+<p>Usually, caches live on the server hosting the Next.js app, like in our <strong>Container</strong> setup.</p>
+<p>Lambda functions don&#39;t have their own storage, so OpenNext uses an S3 bucket for shared cache. This means all Lambda functions can use the same cache data.</p>
+<p>But there&#39;s a catch with Lambda@Edge. <strong>If the cache&#39;s S3 bucket is in a different region, Lambda@Edge has to fetch data across regions, causing delays.</strong> Still, our tests show Lambda@Edge is faster than getting a response from another region. And for paths without cache, Lambda@Edge is much quicker.</p>
+<p><img src="resources/next-edge-lambda-cache-bucket.png" alt="Edge lambda cache bucket"></p>
+<hr>
+<h2>Test 2 - Load Testing</h2>
+<p>For load testing, I&#39;m using <a href="https://www.npmjs.com/package/autocannon">autocannon</a>, a NodeJS tool, with these settings:</p>
+<ul>
+<li><strong>Pipelining</strong>: Set to 10 to up the load, allowing 10 requests at once per connection.</li>
+<li><strong>Connections</strong>: Adjusting this changes requests per second. I&#39;ll test with 3, 10, 30, 50, 100, 200, 300, 500 connections.</li>
+</ul>
+<p>I&#39;ll test <strong>Lambda</strong> and <strong>Container</strong> setups from an <code>eu-west-1</code> EC2 instance:</p>
+<ul>
+<li>Each test runs for 60 seconds.</li>
+<li>All requests hit the root (<code>/</code>) path.</li>
+<li>I&#39;ll watch how load affects <strong>latency</strong> and <strong>error rates</strong> to find each setup&#39;s limits.</li>
+</ul>
+<blockquote>
+<p>No Lambda@Edge test—it&#39;d be similar to the regular Lambda setup.</p>
+</blockquote>
+<h3>Test 2 - Results</h3>
+<p>Lambda setups can scale massively without much limit, giving each request full memory and CPU. This is great for handling heavy tasks like database operations.</p>
+<p>Containers, though, share resources among all incoming requests. This can limit performance per request.</p>
+<blockquote>
+<p>Normally, you can scale containers up (more resources per container) or out (more containers for the load). For this test, I didn&#39;t scale our container to see its baseline capacity.</p>
+</blockquote>
+<p><img src="resources/latency_plot.png" alt="Latencies - increased load"></p>
+<h4>Lambda results</h4>
+<p>Interestingly, Lambda showed higher latencies than expected in this test, even though AWS Cloudwatch metrics suggest an average duration around 25 ms. Surprisingly, we saw latencies around 300ms at low load, with the lowest latencies still above 200ms. This indicates delays might not be from Lambda&#39;s execution itself but perhaps from network delays or Lambda URL limitations.</p>
+<p>Increasing the load to about 200 connections (~6000 req/sec) made Lambda&#39;s latency go up. It seemed like throttling might be the cause, but with only two 429 errors out of over 250,000 requests, it wasn&#39;t clear.</p>
+<p>Further testing suggested Lambda&#39;s execution time wasn&#39;t the issue since the average stayed low even under heavy load. It looks like Lambda&#39;s URL might be queuing requests, causing the increase in latency without sending many throttling errors. This theory matches our observations, though there&#39;s no official confirmation—just an <a href="https://repost.aws/questions/QUcL83FbaRTratTYprSLN-BA/lambda-function-url-throttling">unanswered question on the AWS forum</a> with similar queries.</p>
+<h4>Container Results</h4>
+<p>As we increased traffic, container latency began to spike. At about 70 connections (~700 req/sec), latency hit <strong>1 second</strong> and then increased rapidly. The next chart shows a rise in 503 errors due to this overload.</p>
+<p><img src="resources/request_response_plot_sqrt.png" alt="Processed requests"></p>
+<p>This confirms the container can handle roughly 4500 requests per minute, aligning with our earlier ~700 req/sec estimate.</p>
+<blockquote>
+<p>Remember, this test&#39;s setup might differ from real-world Next.js apps. Your app, especially in production, could be doing more complex tasks like pulling data from databases or APIs.</p>
+</blockquote>
+<hr>
+<h2>Pricing Comparison</h2>
+<p>From Test 2&#39;s data on container capacity, we can create pricing models to see when Containers or Lambdas are more cost-effective.</p>
+<p>We&#39;re looking at 4 setups:</p>
+<ol>
+<li>Lambda (using OpenNext)</li>
+<li>Lambda@Edge (using OpenNext)</li>
+<li>Fargate container + HTTP API Gateway</li>
+<li>Fargate container + Application Load Balancer</li>
+</ol>
+<blockquote>
+<p>I&#39;ve included <code>Fargate container + Application Load Balancer</code> for a fuller comparison, even though it wasn&#39;t in the initial tests. It&#39;s comparable to the HTTP API Gateway setup but offers a broader view.</p>
+</blockquote>
+<h3>1. Lambda Environment Cost</h3>
+<p>Here&#39;s what AWS charges:</p>
+<ul>
+<li><strong>Execution Cost</strong>: About $0.0000000167 for 1ms of use with 1024MB memory.</li>
+<li><strong>Request Cost</strong>: $0.20 per million requests.</li>
+<li><strong>S3 Costs</strong>: $0.0004 for 1000 GET requests and $0.005 for 1000 PUT requests.</li>
+</ul>
+<p>Monthly cost breakdown (x = monthly requests):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Formula</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>+</td>
+<td><code>average_lambda_function_duration * 0.0000000167 * x</code></td>
+<td>Execution time cost</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>0.0000002 * x</code></td>
+<td>Cost per request</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>x * 0.0004 / 1000 + x / 50 * 0.005 / 1000</code></td>
+<td>S3 bucket cost (1 GET per request, 1 PUT every 50 requests)</td>
+</tr>
+</tbody></table>
+<h3>2. Lambda@Edge Environment Cost</h3>
+<p>AWS pricing details:</p>
+<ul>
+<li><strong>Execution Cost</strong>: Roughly $0.00000005001 per ms for 1024MB memory.</li>
+<li><strong>Request Cost</strong>: $0.60 per million requests.</li>
+<li><strong>S3 Costs</strong>: Same as Lambda - $0.0004 for 1000 GET and $0.005 for 1000 PUT requests.</li>
+</ul>
+<p>Monthly cost formula (x = monthly requests):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Formula</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>+</td>
+<td><code>average_lambda_function_duration * 0.00000005001 * x</code></td>
+<td>Execution time cost</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>0.0000006 * x</code></td>
+<td>Cost per request</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>x * 0.0004 / 1000 + x / 50 * 0.005 / 1000</code></td>
+<td>S3 bucket cost (1 GET per request, 1 PUT every 50 requests)</td>
+</tr>
+</tbody></table>
+<h3>3. Fargate Container + HTTP API Gateway Cost</h3>
+<p>AWS charges for this setup are as follows:</p>
+<ul>
+<li><strong>Fargate Container</strong>: About $0.0244/hour, which is roughly $17.5 per month.</li>
+<li><strong>HTTP API Gateway</strong>: $1 per million requests.</li>
+</ul>
+<p>Here&#39;s how to calculate monthly costs (x = number of requests per month):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Formula</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>+</td>
+<td><code>17.5 * ceil((x+1) / (2592000 * number_of_req_per_sec_handled_by_single_container))</code></td>
+<td>Cost of running Fargate (2592000 seconds = 1 month)</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>x / 1000000</code></td>
+<td>Cost for using HTTP API Gateway</td>
+</tr>
+</tbody></table>
+<h3>4. Fargate Container + Application Load Balancer Cost</h3>
+<p>AWS pricing for this configuration:</p>
+<ul>
+<li><strong>Fargate Container</strong>: Around $0.0244/hour, so $17.5 per month.</li>
+<li><strong>Application Load Balancer</strong>: A fixed fee of $16.2 plus $0.008 per LCU hour, totaling about $5.76 a month for LCUs.</li>
+</ul>
+<p>Monthly cost formula (x = number of requests per month):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Formula</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>+</td>
+<td><code>17.5 * ceil((x+1) / (2592000 * number_of_req_per_sec_handled_by_single_container))</code></td>
+<td>Cost for Fargate container, considering a month has 2592000 seconds</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>16.2</code></td>
+<td>Monthly fixed fee for Application Load Balancer</td>
+</tr>
+<tr>
+<td>+</td>
+<td><code>x / (2592000 * 1000) * number_of_lcus_needed_for_thousand_req_sec * 5.76</code></td>
+<td>Additional fee for LCUs based on usage</td>
+</tr>
+</tbody></table>
+<h3>Pricing Comparison Results</h3>
+<p>I tweaked the formulas a bit by introducing some constants. To get the full picture, we&#39;ll set specific values for these constants. Later, I&#39;ll show how changing these values affects costs:</p>
+<ul>
+<li><p><code>average_lambda_function_duration</code>: The test showed an average of 27ms, but real-world sites might see higher times due to complexity. We&#39;ll use <strong>50ms</strong> for this simulation.</p>
+</li>
+<li><p><code>number_of_lcus_needed_for_thousand_req_sec</code>: We&#39;ll set this at <strong>50</strong>, but it might vary based on the data your requests handle.</p>
+</li>
+<li><p><code>number_of_req_per_sec_handled_by_single_container</code>: Although the test container managed over 500 req/sec, real-world use might lower this number. We&#39;ll estimate <strong>100 req/sec</strong> for simplicity.</p>
+</li>
+</ul>
+<p><img src="resources/pricing-comparison-50-50-100.png" alt="Pricing comparison"></p>
+<p>Low average load means Lambda is usually cheaper—great for sites where CDN caching handles most content.</p>
+<p>But as Lambda functions get busier, costs rise. More traffic to your Next.js app could mean:</p>
+<ul>
+<li>Skipping CDN caching,</li>
+<li>Short cache revalidation times,</li>
+<li>Frequent uncachable API calls.</li>
+</ul>
+<p>At 3 req/sec for Lambda@Edge and 9 req/sec for Lambda, switching to container setups might be better.</p>
+<blockquote>
+<p>Note: Many sites won&#39;t hit these traffic levels to the server due to CDN caching, making Lambda cost-effective.</p>
+</blockquote>
+<p>Changing constants like <code>average_lambda_function_duration</code>, <code>number_of_req_per_sec_handled_by_single_container</code>, or cache request rates will affect your costs.</p>
+<p>Here&#39;s another comparison with <code>average_lambda_function_duration</code> at <strong>30ms</strong> and <code>number_of_req_per_sec_handled_by_single_container</code> at <strong>50</strong>:</p>
+<p><img src="resources/pricing-comparison-30-50-50.png" alt="Pricing comparison - adjusted constants"></p>
+<p>Remember, these estimates don&#39;t cover AWS Data Transfer fees, which are similar across all environments and don&#39;t significantly impact cost comparison.</p>
+<hr>
+<h2>Conclusion</h2>
+<p>Our exploration into Next.js hosting on AWS has given us valuable insights into how different setups perform. It&#39;s important to note, though, that your app might see different results based on a variety of factors.</p>
+<p>Here are the main points we&#39;ve learned:</p>
+<p><strong>Lambda is great when:</strong></p>
+<ul>
+<li>You&#39;re not hitting 5-10 requests per second all the time, which is common since CDN caching helps reduce direct hits to your Lambda.</li>
+<li>You need to scale up fast because of unpredictable traffic. Lambda can handle this automatically.</li>
+<li>Watch out for Lambda@Edge costs if your app serves users globally. It&#39;s efficient but can get expensive.</li>
+</ul>
+<p><strong>Containers might be better if:</strong></p>
+<ul>
+<li>You&#39;ve got steady traffic over 5-10 requests per second.</li>
+<li>You&#39;re looking to avoid the delay from Lambda&#39;s cold starts.</li>
+<li>Your app sees consistent traffic without big jumps, fitting the container&#39;s scaling model.</li>
+</ul>
+<p>Appreciate you sticking around till the end! If you catch any mistakes in our data or you&#39;re curious about other comparisons, just shout.</p>
